@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e
+set -x
+
+set
+echo $PWD
+
+# Don't test release branches
+
+docker run --rm=true -i -v $PWD:/source -v ~/.buildbox/be-bundle-cache:/cache -v /tmp/ramdisk:/tmp/ramdisk -w /source -t exchangegroup/teg-ci /source/inside_docker

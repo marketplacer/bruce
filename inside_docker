@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+export PATH=/usr/share/go/bin:$PATH
+export GOROOT=/usr/share/go
+export GOPATH=/go
+
+echo "--- setting up build environment"
+mkdir -p /go/src/github.com/exchangegroup/bruce
+rsync -r --exclude .git /source/ /go/src/github.com/exchangegroup/bruce/
+
+cd /go/src/github.com/exchangegroup/bruce/
+
+echo "--- getting dependencies"
+go get -t ./...
+
+echo "--- testing"
+make test
