@@ -17,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 
+	"launchpad.net/goamz/s3"
+
 	"github.com/gorilla/mux"
 	"github.com/nfnt/resize"
 )
@@ -28,7 +30,18 @@ type ImageResponse struct {
 }
 
 // Path used for storing images on local disk
-var ImageDir string
+var (
+	ImageDir           string
+	S3Connection       *s3.S3
+	BucketName         string
+	ErrS3NotConfigured = errors.New("S3 Not configured")
+	ErrFileNotFound    = errors.New("File not found")
+)
+
+func serverError(r http.ResponseWriter, req *http.Request, err error) {
+	log.Println("Server error", err)
+	http.Error(r, "Something went wrong", 500)
+}
 
 func imagePath(imageID string) string {
 	if ImageDir == "" {
@@ -52,26 +65,57 @@ func imageHandler(r http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
 	imageData, err := fetchImage(vars["imageId"], vars["size"])
-	if os.IsNotExist(err) {
+	if err == ErrFileNotFound {
 		http.NotFound(r, req)
 		return
 	} else if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 
 	imageBytes, err := ioutil.ReadAll(imageData)
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 	_, err = r.Write(imageBytes)
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 
 }
 
 func fetchImage(imageID string, size string) (io.Reader, error) {
 	imageReader, err := os.Open(imagePath(imageID))
+
+	if os.IsNotExist(err) {
+		if S3Connection == nil {
+			return nil, ErrS3NotConfigured
+		}
+
+		bucket := S3Connection.Bucket(BucketName)
+		downloader, err := bucket.GetReader("/bruce/images/" + imageID)
+		if err != nil {
+			return nil, err
+		}
+
+		outputFile, err := os.Create(imagePath(imageID))
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = io.Copy(outputFile, downloader)
+		if err != nil {
+			return nil, err
+		}
+
+		err = outputFile.Close()
+		if err != nil {
+			return nil, err
+		}
+		return fetchImage(imageID, size) // next time this will work for sure
+	}
 
 	if err != nil {
 		return nil, err
@@ -105,7 +149,7 @@ func fetchImage(imageID string, size string) (io.Reader, error) {
 	imageOut := &bytes.Buffer{}
 	err = jpeg.Encode(imageOut, resizedImage, nil)
 	if err != nil {
-		log.Panicln(err)
+		return nil, err
 	}
 
 	return imageOut, nil
@@ -117,23 +161,44 @@ func uploadHandler(r http.ResponseWriter, req *http.Request) {
 	filename := filepath.Base(header.Filename)
 
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 	bytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
-	sum := ChecksumFile(bytes)
+	sum, err := ChecksumFile(bytes)
+	if err != nil {
+		serverError(r, req, err)
+		return
+	}
+
+	if S3Connection == nil {
+		serverError(r, req, errors.New("No S3 connection"))
+		return
+	}
+
+	bucket := S3Connection.Bucket(BucketName)
+
+	err = bucket.Put("/bruce/images/"+sum, bytes, "binary-stream", "public-read")
+	if err != nil {
+		serverError(r, req, err)
+		return
+	}
 
 	_, err = os.Stat(imagePath(sum))
 
 	if os.IsNotExist(err) {
 		err = ioutil.WriteFile(imagePath(sum), bytes, 0444)
 		if err != nil {
-			log.Panicln(err)
+			serverError(r, req, err)
+			return
 		}
 	} else if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 
 	imageResponse := ImageResponse{
@@ -143,21 +208,23 @@ func uploadHandler(r http.ResponseWriter, req *http.Request) {
 
 	responseJSON, err := json.Marshal(imageResponse)
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 	req.Header.Add("Content-Type", "application/json")
 	_, err = r.Write(responseJSON)
 	if err != nil {
-		log.Panicln(err)
+		serverError(r, req, err)
+		return
 	}
 }
 
 // ChecksumFile Return SHA256 for []byte input
-func ChecksumFile(file []byte) string {
+func ChecksumFile(file []byte) (string, error) {
 	hasher := sha256.New()
 	_, err := hasher.Write(file)
 	if err != nil {
-		log.Panicln(err)
+		return "", err
 	}
-	return fmt.Sprintf("%x", hasher.Sum(nil))
+	return fmt.Sprintf("%x", hasher.Sum(nil)), nil
 }
