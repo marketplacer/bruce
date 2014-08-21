@@ -2,9 +2,8 @@
 
 set -e
 
-export PATH=~/.buildbox:$PATH
 cd docker
-buildbox-artifact download "output/bruce" .
+~/.buildbox/buildbox-artifact download "output/bruce" .
 
 docker build -t exchangegroup/bruce .
 docker push exchangegroup/bruce
