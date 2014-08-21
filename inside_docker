@@ -24,5 +24,6 @@ go install github.com/exchangegroup/bruce/bin/bruce
 
 echo "--- packaging"
 rm $GOPATH/bin/errcheck #don't want to ship errcheck
-mkdir /source/output/
+mkdir -p /source/output/
+rm -rf /source/output/*
 cp $GOPATH/bin/* /source/output/
