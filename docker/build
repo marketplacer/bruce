@@ -4,6 +4,6 @@ set -e
 
 cd docker
 ~/.buildbox/buildbox-artifact download "output/bruce" .
-
+chmod +x output/bruce
 docker build -t exchangegroup/bruce .
 docker push exchangegroup/bruce
