@@ -18,3 +18,11 @@ go get github.com/kisielk/errcheck
 
 echo "--- testing"
 make test
+
+echo "--- building"
+go install github.com/exchangegroup/bruce/bin/bruce
+
+echo "--- packaging"
+rm $GOPATH/bin/errcheck #don't want to ship errcheck
+mkdir /source/output/
+cp $GOPATH/bin/* /source/output/
