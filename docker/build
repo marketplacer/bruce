@@ -2,6 +2,7 @@
 
 set -e
 
+export PATH=~/.buildbox:$PATH
 cd docker
 buildbox-artifact download "output/bruce" .
 
