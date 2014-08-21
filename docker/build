@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+cd docker
+buildbox-artifact download "output/bruce" .
+
+docker build -t exchangegroup/bruce .
+docker push exchangegroup/bruce
