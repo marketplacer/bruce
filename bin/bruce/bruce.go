@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	webserver.ImageDir = "/tmp"
+	webserver.ImageDir = os.Getenv("IMAGE_DIR")
 
 	webserver.BucketName = os.Getenv("BUCKET")
 
