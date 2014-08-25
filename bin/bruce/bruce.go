@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -22,8 +23,13 @@ func main() {
 	}
 
 	webserver.S3Connection = s3.New(auth, aws.APSoutheast2)
+
+	fmt.Printf("%25s %-s\n", "IMAGE_DIR", webserver.ImageDir)
+	fmt.Printf("%25s %-s\n", "BUCKET", webserver.BucketName)
+	fmt.Printf("%25s %-s\n", "AWS_ACCESS_KEY_ID", os.Getenv("AWS_ACCESS_KEY_ID"))
+	fmt.Printf("%25s %-s\n", "AWS_SECRET_ACCESS_KEY", os.Getenv("AWS_SECRET_ACCESS_KEY"))
+	fmt.Printf("%25s %-s\n", "PORT", "8901")
 	r := webserver.Router()
 	http.Handle("/", r)
-	log.Println("Starting bruce on http://localhost:8901")
 	log.Panicln(http.ListenAndServe(":8901", nil))
 }
